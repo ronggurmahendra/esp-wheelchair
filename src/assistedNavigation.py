@@ -112,10 +112,10 @@ def userInputCallback(msg, right):
         print ("ABOUT TO COLLIDE BACK EMERGENCY BRAKE")
         outputLinear = 0
     # Check if wheelchair_emergency_stopped is defined 
-    if rospy.has_param('wheelchair_emergency_stopped'):
-        # check if wheelchair_emergency_stopped is TRUE
-        if rospy.get_param('wheelchair_emergency_stopped'):
-            return
+    # if rospy.has_param('wheelchair_emergency_stopped'):
+    #     # check if wheelchair_emergency_stopped is TRUE
+    #     if rospy.get_param('wheelchair_emergency_stopped'):
+    #         return
 
 
     # publish the output to wheels 
