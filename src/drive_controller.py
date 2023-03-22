@@ -13,13 +13,14 @@ from cv_bridge import CvBridge, CvBridgeError
 from manual_control import * 
 from repelent_field_control import *
 from user_input_handler import *
+from drive_mode import *
 
 # Parameters
 USE_VISUAL_POINT_CLOUD = False # USE_VISUAL_POINT_CLOUD if true will open a window that show the ToF sensor output
 USE_REAR_CAMERA = False # USE_REAR_CAMERA if true will publish a data of rear camera 
 
 USE_EMERGENCYSTOP = True # USE_EMERGENCYSTOP Will use emergency stop when distance to obstacle below the THRESHOLD_EMERGENCYSTOP
-USE_SIMULATION = False
+USE_SIMULATION = True
 
 INPUT_PWM_MIN = 0 # Input PWM minimum value
 INPUT_PWM_RANGE = 30 # Input PWM range value
@@ -33,9 +34,12 @@ TOF_2_PITCH = -5
 
 LEFT_MOTOR_TOPIC_OUTPUT = "/roboy/pinky/middleware/espchair/wheels/left"
 RIGHT_MOTOR_TOPIC_OUTPUT = "/roboy/pinky/middleware/espchair/wheels/right"
-ASSISTED_NAVIGATION_TOPIC_OUTPUT = '/roboy/pinky/middleware/espchair/wheels/assisted_navigation'
+
 LEFT_MOTOR_TOPIC_INPUT = "/roboy/pinky/middleware/espchair/wheels/left/input"
 RIGHT_MOTOR_TOPIC_INPUT = "/roboy/pinky/middleware/espchair/wheels/right/input"
+
+ASSISTED_NAVIGATION_TOPIC_OUTPUT = '/roboy/pinky/middleware/espchair/wheels/assisted_navigation'
+
 MIN_DIST_FRONT_TOPIC = "/roboy/pinky/middleware/espchair/wheels/dist/front"
 MIN_DIST_BACK_TOPIC = "/roboy/pinky/middleware/espchair/wheels/dist/back"
 
@@ -44,7 +48,7 @@ inputAngular = None
 manualMode = ManualMode()
 repelentMode = RepelentMode()
 userInputHandler = UserInputHandler(INPUT_PWM_MIN, INPUT_PWM_RANGE)
-Mode = manualMode
+mode = DriveMode(manualMode)
 
 sign = lambda a: (a>0) - (a<0)
     
@@ -60,10 +64,10 @@ def modeCallBack(msg):
     """
     if(msg.data == 1):
         print("Changing Mode to Manual")
-        Mode = manualMode
+        mode.setMode(manualMode)
     elif(msg.data == 2):
         print("Changing Mode to Repelent")
-        Mode = repelentMode
+        mode.setMode(repelentMode)
 
 def repelentFieldCallBack(msg):
     """ Callback funtion for '/roboy/pinky/middleware/espchair/wheels/repelent_field' to change the tye of repellent field """
@@ -81,11 +85,10 @@ def repelentFieldCallBack(msg):
         print("Changing Repelelent field to Quadratic")
         repelentMode.setFunction(msg.data)
         
-def minDistanceCallback(msg, args):
+def minDistanceCallback(msg, front):
     """ Callback function for front ToF sensor """
-    # parse arg consist of boolean front and int angle  
-    front = args[0]
-    
+    # subscribe to MinDist topic to feed into repelent Mode  
+    print("ToF distance : ", msg.data)
     if(front):
         repelentMode.setDistanceFront(msg.data)
     else:
@@ -102,7 +105,7 @@ def userInputCallback(msg, right):
     # call the current Mode control function to get the adjusted output
     inputLinear,inputAngular = userInputHandler.getUserInput()
     print("inputLinear,inputAngular : ", inputLinear,inputAngular)
-    outputLinear,outputAngular = Mode.control(inputLinear,inputAngular)
+    outputLinear,outputAngular = mode.control(inputLinear,inputAngular)
 
     # if the minimum distance is within a certaun threshold then brake
     if(repelentMode.getDistanceFront() < THRESHOLD_EMERGENCYSTOP and inputLinear > 0 and USE_EMERGENCYSTOP): # this is the front ToF
@@ -160,14 +163,8 @@ if __name__ == "__main__":
     user_input_sub_r = rospy.Subscriber(RIGHT_MOTOR_TOPIC_INPUT, Int16, userInputCallback, True)
     user_input_sub_l = rospy.Subscriber(LEFT_MOTOR_TOPIC_INPUT, Int16, userInputCallback, False)
 
-    min_dist_front_pub = rospy.Subscriber(MIN_DIST_FRONT_TOPIC, Int16, minDistanceCallback, (True))
-    min_dist_back_pub = rospy.Subscriber(MIN_DIST_BACK_TOPIC, Int16, minDistanceCallback, (False))
-
-    # # initialize pointlcloud subscriber for ToF sensor
-    # # ToF 1 for the back hence first arg is False
-    # point_cloud_1_sub = rospy.Subscriber('/tof1_driver/point_cloud', PointCloud2, minDistanceCallback, (False))
-    # # ToF 2 for the front hence first arg is True
-    # point_cloud_2_sub = rospy.Subscriber('/tof2_driver/point_cloud', PointCloud2, minDistanceCallback, (True))
+    min_dist_front_pub = rospy.Subscriber(MIN_DIST_FRONT_TOPIC, Float64, minDistanceCallback, True)
+    min_dist_back_pub = rospy.Subscriber(MIN_DIST_BACK_TOPIC, Float64, minDistanceCallback, False)
 
     print("publishing to /roboy/pinky/middleware/espchair/wheels/assisted_navigation. Spinning...")
     rospy.spin()

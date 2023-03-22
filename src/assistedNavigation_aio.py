@@ -2,7 +2,7 @@
 Usage:
 
 cd esp-wheelchair
-python3 src/tof.py
+python3 src/assistedNavigation_aio.py
 
 """
 import rospy
@@ -20,6 +20,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from manual_control import * 
 from repelent_field_control import *
 from user_input_handler import *
+from drive_mode import *
 
 # Parameters
 USE_VISUAL_POINT_CLOUD = False # USE_VISUAL_POINT_CLOUD if true will open a window that show the ToF sensor output
@@ -56,7 +57,7 @@ inputAngular = None
 manualMode = ManualMode()
 repelentMode = RepelentMode()
 userInputHandler = UserInputHandler(INPUT_PWM_MIN, INPUT_PWM_RANGE)
-Mode = manualMode
+mode = DriveMode(manualMode)
 
 sign = lambda a: (a>0) - (a<0)
     
@@ -103,10 +104,10 @@ def modeCallBack(msg):
     """
     if(msg.data == 1):
         print("Changing Mode to Manual")
-        Mode = manualMode
+        mode.setMode(manualMode)
     elif(msg.data == 2):
         print("Changing Mode to Repelent")
-        Mode = repelentMode
+        mode.setMode(repelentMode)
 
 def repelentFieldCallBack(msg):
     """ Callback funtion for '/roboy/pinky/middleware/espchair/wheels/repelent_field' to change the tye of repellent field """
@@ -164,7 +165,7 @@ def userInputCallback(msg, right):
     # call the current Mode control function to get the adjusted output
     inputLinear,inputAngular = userInputHandler.getUserInput()
     print("inputLinear,inputAngular : ", inputLinear,inputAngular)
-    outputLinear,outputAngular = Mode.control(inputLinear,inputAngular)
+    outputLinear,outputAngular = mode.control(inputLinear,inputAngular)
 
     # if the minimum distance is within a certaun threshold then brake
     if(repelentMode.getDistanceFront() < THRESHOLD_EMERGENCYSTOP and inputLinear > 0 and USE_EMERGENCYSTOP): # this is the front ToF
